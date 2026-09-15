@@ -8,32 +8,67 @@ TELEGRAM_BOT_TOKEN = "8840603076:AAGQMONbsnWupYegm2dhzXYTkra3M_R7ICg"
 TELEGRAM_CHAT_ID = "8798719105"
 
 HTML_CONTENT = """<!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Customer Inquiry</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quick Service Booking</title>
     <style>
-        body { font-family: Arial; padding: 20px; background: #f4f4f4; }
-        .form-box { background: white; padding: 20px; border-radius: 8px; max-width: 400px; margin: auto; }
-        input, button { width: 100%; padding: 10px; margin: 8px 0; box-sizing: border-box; }
-        button { background: #007bff; color: white; border: none; font-weight: bold; cursor: pointer; }
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background: #eef2f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 15px; }
+        .card { background: #ffffff; padding: 30px; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.1); width: 100%; max-width: 420px; }
+        .card h2 { margin-top: 0; color: #1e293b; text-align: center; font-size: 24px; }
+        .card p { color: #64748b; font-size: 14px; text-align: center; margin-bottom: 20px; }
+        label { font-size: 13px; font-weight: 600; color: #334155; margin-bottom: 5px; display: block; }
+        input, select { width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 15px; outline: none; transition: border 0.2s; }
+        input:focus, select:focus { border-color: #2563eb; }
+        button { width: 100%; padding: 14px; background: #2563eb; color: #ffffff; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+        button:hover { background: #1d4ed8; }
+        .status-msg { display: none; margin-top: 15px; padding: 12px; border-radius: 8px; background: #dcfce7; color: #166534; font-size: 14px; text-align: center; font-weight: 600; }
+        .wa-btn { display: none; margin-top: 10px; width: 100%; padding: 12px; background: #25d366; color: white; border-radius: 8px; text-decoration: none; text-align: center; font-weight: 600; box-sizing: border-box; }
     </style>
 </head>
 <body>
-    <div class="form-box">
+    <div class="card">
         <h2>Book a Service</h2>
-        <input type="text" id="name" placeholder="Your Name">
-        <input type="text" id="phone" placeholder="Phone Number">
-        <input type="text" id="service" placeholder="Service Needed">
-        <button onclick="sendLead()">Submit Inquiry</button>
-        <p id="msg" style="color: green; font-weight: bold;"></p>
+        <p>Fill out the form below for immediate dispatch.</p>
+        
+        <label>Full Name</label>
+        <input type="text" id="name" placeholder="John Doe">
+        
+        <label>Phone Number</label>
+        <input type="tel" id="phone" placeholder="+971 50 123 4567">
+        
+        <label>Service Required</label>
+        <select id="service">
+            <option value="AC Maintenance & Repair">AC Maintenance & Repair</option>
+            <option value="Plumbing Service">Plumbing Service</option>
+            <option value="Electrical Repair">Electrical Repair</option>
+            <option value="Deep Cleaning">Deep Cleaning</option>
+            <option value="General Inspection">General Inspection</option>
+        </select>
+        
+        <button onclick="sendLead()">Submit Request</button>
+        
+        <div id="msg" class="status-msg">Inquiry submitted successfully!</div>
+        <a id="wa" href="#" target="_blank" class="wa-btn">💬 Chat directly on WhatsApp</a>
     </div>
 
     <script>
         function sendLead() {
+            const name = document.getElementById('name').value;
+            const phone = document.getElementById('phone').value;
+            const service = document.getElementById('service').value;
+
+            if(!name || !phone) {
+                alert("Please fill in both Name and Phone number.");
+                return;
+            }
+
             const data = {
-                customer_name: document.getElementById('name').value,
-                phone: document.getElementById('phone').value,
-                service_requested: document.getElementById('service').value,
+                customer_name: name,
+                phone: phone,
+                service_requested: service,
                 timestamp: new Date().toLocaleString()
             };
 
@@ -45,7 +80,10 @@ HTML_CONTENT = """<!DOCTYPE html>
             .then(res => res.json())
             .then(result => {
                 if(result.status === "success") {
-                    document.getElementById('msg').innerText = "Inquiry sent! Saved to database & alert sent.";
+                    document.getElementById('msg').style.display = "block";
+                    const waBtn = document.getElementById('wa');
+                    waBtn.href = "https://wa.me/" + phone.replace(/[^0-9]/g, '');
+                    waBtn.style.display = "block";
                 }
             });
         }
