@@ -4,8 +4,11 @@ import urllib.request
 import json
 import os
 
-TELEGRAM_BOT_TOKEN = "8840603076:AAGQMONbsnWupYegm2dhzXYTkra3M_R7ICg"
-TELEGRAM_CHAT_ID = "8798719105"
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
+TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
+GROK_API_KEY = os.environ.get("GROK_API_KEY")
+GROK_MODEL = os.environ.get("GROK_MODEL", "grok-4.7")
+GROK_API_URL = "https://api.x.ai/v1/chat/completions"
 
 HTML_CONTENT = """<!DOCTYPE html>
 <html lang="en">
@@ -100,13 +103,55 @@ def send_telegram_alert(lead_data):
         f"🛠️ *Service:* {lead_data.get('service_requested')}\n"
         f"⏰ *Time:* {lead_data.get('timestamp')}"
     )
+    if lead_data.get("ai_follow_up_note"):
+        message += f"\n\n🤖 *Suggested follow-up:* {lead_data['ai_follow_up_note']}"
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+        print("Telegram alert skipped: Telegram credentials are not configured.")
+        return
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     payload = json.dumps({"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": "Markdown"}).encode('utf-8')
     req = urllib.request.Request(url, data=payload, headers={'Content-Type': 'application/json'})
     try:
-        urllib.request.urlopen(req)
+        urllib.request.urlopen(req, timeout=10)
     except Exception as e:
-        print("Telegram error:", e)
+        print("Telegram error:", type(e).__name__)
+
+def generate_grok_follow_up_note(lead_data):
+    if not GROK_API_KEY:
+        return None
+
+    service = str(lead_data.get("service_requested", "service"))[:200]
+    payload = json.dumps({
+        "model": GROK_MODEL,
+        "messages": [
+            {
+                "role": "system",
+                "content": "Write one concise, professional follow-up note for a home-services lead. Do not invent facts or claim a booking is confirmed.",
+            },
+            {
+                "role": "user",
+                "content": f"The customer requested: {service}",
+            },
+        ],
+        "max_tokens": 100,
+        "temperature": 0.3,
+    }).encode("utf-8")
+    req = urllib.request.Request(
+        GROK_API_URL,
+        data=payload,
+        headers={
+            "Authorization": "Bearer " + GROK_API_KEY,
+            "Content-Type": "application/json",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as response:
+            result = json.loads(response.read().decode("utf-8"))
+        note = result["choices"][0]["message"]["content"]
+        return note.strip()[:500] if isinstance(note, str) and note.strip() else None
+    except Exception as e:
+        print("Grok error:", type(e).__name__)
+        return None
 
 def save_to_firebase(lead_data):
     url = "https://clientleadautomation-default-rtdb.firebaseio.com/leads.json"
@@ -129,7 +174,11 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             content_length = int(self.headers['Content-Length'])
             post_data = self.rfile.read(content_length)
             lead_data = json.loads(post_data.decode('utf-8'))
-            
+
+            follow_up_note = generate_grok_follow_up_note(lead_data)
+            if follow_up_note:
+                lead_data["ai_follow_up_note"] = follow_up_note
+
             save_to_firebase(lead_data)
             send_telegram_alert(lead_data)
             
